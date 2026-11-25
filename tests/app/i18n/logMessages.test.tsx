@@ -275,6 +275,14 @@ const SAMPLES: { [K in LogMessageKey]: LogMessageParams[K] } = {
   examineForceSwap: { actor: A, target: B },
   examineSwapDeckEmpty: { actor: A },
   examineReturn: { actor: A, target: B },
+  tableAssassinatePaid: { actor: A, amount: 3 },
+  tableCoupPaid: { actor: A, amount: 7 },
+  tableProved: { actor: A, character: Character.Duke },
+  tablePassed: { actor: A },
+  tableUndone: { actor: A },
+  tableCoinsAdded: { actor: A, amount: 1 },
+  tableCoinsRemoved: { actor: A, amount: 1 },
+  tableLeft: { actor: B },
 };
 
 const entryFor = (key: LogMessageKey): LogEntry => ({

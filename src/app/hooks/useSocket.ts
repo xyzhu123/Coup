@@ -151,8 +151,8 @@ export function useSocket() {
       useGameStore.getState().setReconnecting(false);
     };
 
-    const onRoomUpdatedRaw = (data: { players: ClientRoomPlayer[]; hostId: string; settings: RoomSettings; lastWinnerId?: string | null; spectators?: ClientSpectator[] }) => {
-      setRoomPlayers(data.players, data.hostId, data.settings, data.lastWinnerId, data.spectators);
+    const onRoomUpdatedRaw = (data: { players: ClientRoomPlayer[]; hostId: string; settings: RoomSettings; lastWinnerId?: string | null; spectators?: ClientSpectator[]; firstPlayerId?: string | null }) => {
+      setRoomPlayers(data.players, data.hostId, data.settings, data.lastWinnerId, data.spectators, data.firstPlayerId);
     };
 
     const onGameState = (state: ClientGameState) => {
@@ -363,6 +363,32 @@ export function useSocket() {
     }));
   }, []);
 
+  /** Host, in the lobby: seat (and turn) order as every player id, clockwise. */
+  const setSeatOrder = useCallback((playerIds: string[]): Promise<void> => {
+    return withTimeout(new Promise((resolve, reject) => {
+      socketRef.current.emit('room:set_seat_order', { playerIds }, (response) => {
+        if (response.success) {
+          resolve();
+        } else {
+          reject(new Error(describeAckError(response, getT()('errors.updateSettingsFailed'))));
+        }
+      });
+    }));
+  }, []);
+
+  /** Host, in the lobby: who takes the first turn in table mode. */
+  const setFirstPlayer = useCallback((playerId: string): Promise<void> => {
+    return withTimeout(new Promise((resolve, reject) => {
+      socketRef.current.emit('room:set_first_player', { playerId }, (response) => {
+        if (response.success) {
+          resolve();
+        } else {
+          reject(new Error(describeAckError(response, getT()('errors.updateSettingsFailed'))));
+        }
+      });
+    }));
+  }, []);
+
   const removeBot = useCallback((botId: string): Promise<void> => {
     return withTimeout(new Promise((resolve, reject) => {
       socketRef.current.emit('bot:remove', { botId }, (response) => {
@@ -451,6 +477,8 @@ export function useSocket() {
     removePlayer,
     removeSpectator,
     updateRoomSettings,
+    setSeatOrder,
+    setFirstPlayer,
     spectateRoom,
     stopSpectating,
     subscribeToBrowser,

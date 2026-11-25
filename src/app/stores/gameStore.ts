@@ -24,11 +24,13 @@ interface GameStore {
   roomPlayers: ClientRoomPlayer[];
   roomSettings: RoomSettings | null;
   lastWinnerId: string | null;
+  /** Table mode: who takes the first turn (null means the first seat). */
+  firstPlayerId: string | null;
   spectators: ClientSpectator[];
   isSpectator: boolean;
   setRoom: (roomCode: string, playerId: string) => void;
   setSpectating: (roomCode: string, spectatorId: string) => void;
-  setRoomPlayers: (players: ClientRoomPlayer[], hostId: string, settings: RoomSettings, lastWinnerId?: string | null, spectators?: ClientSpectator[]) => void;
+  setRoomPlayers: (players: ClientRoomPlayer[], hostId: string, settings: RoomSettings, lastWinnerId?: string | null, spectators?: ClientSpectator[], firstPlayerId?: string | null) => void;
   clearRoom: () => void;
 
   // Game state
@@ -102,16 +104,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
   roomPlayers: [],
   roomSettings: null,
   lastWinnerId: null,
+  firstPlayerId: null,
   spectators: [],
   isSpectator: false,
   setRoom: (roomCode, playerId) => set({ roomCode, playerId, isSpectator: false, rejoinStatus: 'idle' }),
   setSpectating: (roomCode, spectatorId) => set({ roomCode, playerId: spectatorId, isSpectator: true }),
-  setRoomPlayers: (players, hostId, settings, lastWinnerId, spectators) => set({
+  setRoomPlayers: (players, hostId, settings, lastWinnerId, spectators, firstPlayerId) => set({
     roomPlayers: players,
     hostId,
     roomSettings: settings,
     lastWinnerId: lastWinnerId ?? null,
     spectators: spectators ?? [],
+    firstPlayerId: firstPlayerId ?? null,
   }),
   clearRoom: () => set({
     roomCode: null,
@@ -120,6 +124,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     roomPlayers: [],
     roomSettings: null,
     lastWinnerId: null,
+    firstPlayerId: null,
     spectators: [],
     isSpectator: false,
     gameState: null,

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useSocket } from '../../hooks/useSocket';
 import { useGameStore } from '../../stores/gameStore';
 import { GameTable } from '../../components/game/GameTable';
+import { TableModeView } from '../../components/tablemode/TableModeView';
 import { useGameMusic } from '../../hooks/useMusicDirector';
 import { QUICK_PLAY_BOT_COUNT } from '@/shared/constants';
 import { buildBots } from '../../utils/botFill';
@@ -28,7 +29,8 @@ export default function GamePage() {
   // Audio unlock on the first gesture, then the score follows the game —
   // court / tension / duel / sudden death, or fallen once you are out — and
   // stops at game over. See hooks/useMusicDirector.ts.
-  useGameMusic(gameState);
+  // Table mode is played in one room: six phones playing the score would be noise.
+  useGameMusic(gameState?.tableMode ? null : gameState);
 
   const clearPracticeSession = useCallback(() => {
     sessionStorage.removeItem('coup_practice_room');
@@ -142,6 +144,15 @@ export default function GamePage() {
           {error}
         </div>
       )}
+      {gameState.tableMode ? (
+        <TableModeView
+          gameState={gameState}
+          isHost={isHost}
+          isSpectator={isSpectator}
+          onRematch={rematch}
+          onLeave={isSpectator ? undefined : handleLeaveTable}
+        />
+      ) : (
       <GameTable
         gameState={gameState}
         chatMessages={chatMessages}
@@ -161,6 +172,7 @@ export default function GamePage() {
         onNewGame={isSpectator ? undefined : handleNewGame}
         newGamePending={dealingNew}
       />
+      )}
     </>
   );
 }

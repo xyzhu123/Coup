@@ -56,6 +56,16 @@ const log = {
   examineSwapDeckEmpty: "{actor, select, you {You} other {{actor}}} can't force a swap with an empty deck. The card goes back.",
   examineReturn: "{actor, select, you {You return} other {{actor} returns}} {target, select, you {your} other {{target}'s}} card.",
 
+  // Table mode: entries recorded after the table settled them out loud.
+  tableAssassinatePaid: '{actor, select, you {You pay} other {{actor} pays}} {amount, plural, one {# coin} other {# coins}} to assassinate.',
+  tableCoupPaid: '{actor, select, you {You pay} other {{actor} pays}} {amount, plural, one {# coin} other {# coins}} for a Coup.',
+  tableProved: '{actor, select, you {You show} other {{actor} shows}} {character} and {actor, select, you {draw} other {draws}} a replacement.',
+  tablePassed: '{actor, select, you {You end} other {{actor} ends}} the turn with no effect.',
+  tableUndone: '{actor, select, you {You take} other {{actor} takes}} back the last entry.',
+  tableCoinsAdded: '{actor, select, you {You add} other {{actor} adds}} {amount, plural, one {# coin} other {# coins}} as a correction.',
+  tableCoinsRemoved: '{actor, select, you {You remove} other {{actor} removes}} {amount, plural, one {# coin} other {# coins}} as a correction.',
+  tableLeft: '{actor, select, you {You left} other {{actor} left}} the table.',
+
   // ── How a player param reads when it is the reader, mid-sentence ──
   you: 'you',
   /** Shown for a player id the client cannot name (should not happen). */

@@ -179,6 +179,12 @@ export interface GameState {
   useInquisitor: boolean;
   /** Treasury Reserve / Almshouse (coins from conversions) */
   treasuryReserve: number;
+
+  // Table mode (in-person play): see TableEngine
+  /** True when the app only keeps cards and coins and the table talks the rest out. */
+  tableMode?: boolean;
+  /** Player whose last table entry can still be taken back, if any. */
+  tableUndoPlayerId?: string | null;
 }
 
 // ─── Log Event Types ───
@@ -245,6 +251,10 @@ export interface ClientGameState {
   gameMode: GameMode;
   useInquisitor: boolean;
   treasuryReserve: number;
+  /** Table mode (in-person play): the app only keeps cards and coins. */
+  tableMode?: boolean;
+  /** Player whose last table entry can still be taken back, if any. */
+  tableUndoPlayerId?: string | null;
 }
 
 export interface ClientPlayerState {
@@ -381,6 +391,8 @@ export interface Room {
   createdAt: number;
   settings: RoomSettings;
   lastWinnerId?: string | null;
+  /** Table mode: who takes the first turn, chosen by the host. Unset means the first seat. */
+  firstPlayerId?: string | null;
 }
 
 export interface RoomPlayer {
@@ -422,7 +434,25 @@ export interface RoomSettings {
   // Reformation expansion
   gameMode: GameMode;
   useInquisitor: boolean;
+  /**
+   * Table mode, for playing in person: the app deals cards and keeps coins,
+   * and every claim, challenge and block is settled out loud. Classic rules,
+   * humans only, no timers. Optional so settings from older clients still fit.
+   */
+  tableMode?: boolean;
 }
+
+/** The turn-ending entries a player can record in table mode. */
+export const TABLE_ACTIONS = [
+  ActionType.Income,
+  ActionType.ForeignAid,
+  ActionType.Tax,
+  ActionType.Steal,
+  ActionType.Assassinate,
+  ActionType.Coup,
+  ActionType.Exchange,
+] as const;
+export type TableAction = (typeof TABLE_ACTIONS)[number];
 
 // ─── Public Room Info (for room browser) ───
 export interface PublicRoomInfo {

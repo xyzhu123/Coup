@@ -87,6 +87,21 @@ const lobby: NamespaceTranslation<'lobby'> = {
   copied: '已复制',
   copyLink: '复制链接',
   copyLinkFailed: '复制失败，请手动选中上面的链接。',
+
+  // Table mode
+  tableMode: '桌面模式',
+  tableModeOn: '面对面玩。网站只管牌和金币，声称、质疑和阻挡都在桌上口头解决。',
+  tableModeOff: '已关闭。声称、质疑和阻挡都由网站处理。',
+  seatNumber: '{number} 号位',
+  firstPlayer: '先手',
+  setFirstPlayer: '设为先手',
+  setFirstPlayerNamed: '让 {name} 先手',
+  arrangeSeats: '排座位',
+  seatOrderTitle: '座位顺序',
+  seatOrderHelp: '按你们桌上的顺时针方向，依次点每位玩家。',
+  seatOrderRestart: '重排',
+  seatOrderSave: '保存顺序',
+  tableStartHint: '座位按顺时针排列，由 {name} 先手。',
 };
 
 export default lobby;

@@ -1,13 +1,14 @@
 import { Server, Socket } from 'socket.io';
 import { ClientToServerEvents, ServerToClientEvents } from '../shared/protocol';
-import { ActionType, BotPersonality, BotReplaceReason, Character, ClientRoomPlayer, GameState, GameStatus, RoomOrigin, TurnPhase } from '../shared/types';
-import { MAX_PLAYERS, QUICK_PHRASES, REACTIONS,RATE_LIMIT_ROOM_CREATE_MS, RATE_LIMIT_ROOM_JOIN_MS, RATE_LIMIT_GAME_ACTION_MS, RATE_LIMIT_BOT_ADD_MS } from '../shared/constants';
+import { ActionType, BotPersonality, BotReplaceReason, Character, ClientRoomPlayer, GameState, GameStatus, RoomOrigin, TABLE_ACTIONS, TableAction, TurnPhase } from '../shared/types';
+import { MAX_PLAYERS, QUICK_PHRASES, REACTIONS,RATE_LIMIT_ROOM_CREATE_MS, RATE_LIMIT_ROOM_JOIN_MS, RATE_LIMIT_GAME_ACTION_MS, RATE_LIMIT_BOT_ADD_MS, RATE_LIMIT_TABLE_ACTION_MS } from '../shared/constants';
 import { validateName, validateChatMessage } from './ContentFilter';
 import { nameKey } from '../shared/textLimits';
 import { failedAck, serverErrorPayload } from '../shared/i18n/serverErrors';
 import { RoomEvent, RoomManager } from './RoomManager';
 import { serializeForPlayer, serializeForSpectator } from './StateSerializer';
 import { BotController } from './BotController';
+import { TableEngine } from '../engine/TableEngine';
 import { FeedbackService } from './feedback';
 
 type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
@@ -606,6 +607,50 @@ export class SocketHandler {
       this.maybeBroadcastPublicRoomList(found.room, wasPublic);
     });
 
+    socket.on('room:set_seat_order', (data, callback) => {
+      if (typeof callback !== 'function') return;
+      const found = this.roomManager.getPlayerRoom(socket.id);
+      if (!found) {
+        callback(failedAck('Not in a room'));
+        return;
+      }
+      if (found.player.id !== found.room.hostId) {
+        callback(failedAck('Only the host can arrange the seats'));
+        return;
+      }
+      const result = this.roomManager.setSeatOrder(found.room.code, data?.playerIds);
+      if ('error' in result) {
+        callback(failedAck(result.error));
+        return;
+      }
+      callback({ success: true });
+      this.broadcastRoomUpdate(found.room.code);
+    });
+
+    socket.on('room:set_first_player', (data, callback) => {
+      if (typeof callback !== 'function') return;
+      const found = this.roomManager.getPlayerRoom(socket.id);
+      if (!found) {
+        callback(failedAck('Not in a room'));
+        return;
+      }
+      if (found.player.id !== found.room.hostId) {
+        callback(failedAck('Only the host can arrange the seats'));
+        return;
+      }
+      if (typeof data?.playerId !== 'string') {
+        callback(failedAck('Invalid first player'));
+        return;
+      }
+      const result = this.roomManager.setFirstPlayer(found.room.code, data.playerId);
+      if ('error' in result) {
+        callback(failedAck(result.error));
+        return;
+      }
+      callback({ success: true });
+      this.broadcastRoomUpdate(found.room.code);
+    });
+
     socket.on('game:start', () => {
       try {
         const found = this.roomManager.getPlayerRoom(socket.id);
@@ -1028,12 +1073,91 @@ export class SocketHandler {
       if (error) socket.emit('game:error', serverErrorPayload(error));
     });
 
+    // ─── Table mode (in-person play) ───
+    // Each entry records something the table already settled out loud.
+
+    socket.on('table:action', (data) => {
+      const ctx = this.getTableContext(socket);
+      if (!ctx) return;
+      if (!data || !(TABLE_ACTIONS as readonly string[]).includes(data.action)) {
+        socket.emit('game:error', serverErrorPayload('Invalid action'));
+        return;
+      }
+      if (data.targetId !== undefined && typeof data.targetId !== 'string') {
+        socket.emit('game:error', serverErrorPayload('Invalid target'));
+        return;
+      }
+      const error = ctx.engine.tableAction(ctx.player.id, data.action as TableAction, data.targetId);
+      if (error) socket.emit('game:error', serverErrorPayload(error));
+    });
+
+    socket.on('table:pass', () => {
+      const ctx = this.getTableContext(socket);
+      if (!ctx) return;
+      const error = ctx.engine.tablePass(ctx.player.id, ctx.player.id === ctx.room.hostId);
+      if (error) socket.emit('game:error', serverErrorPayload(error));
+    });
+
+    socket.on('table:exchange', (data) => {
+      const ctx = this.getTableContext(socket);
+      if (!ctx) return;
+      if (!data || !Array.isArray(data.keepIndices) || data.keepIndices.length > 4) {
+        socket.emit('game:error', serverErrorPayload('Invalid exchange selection'));
+        return;
+      }
+      const error = ctx.engine.tableExchange(ctx.player.id, data.keepIndices);
+      if (error) socket.emit('game:error', serverErrorPayload(error));
+    });
+
+    socket.on('table:lose_influence', (data) => {
+      const ctx = this.getTableContext(socket);
+      if (!ctx) return;
+      const error = ctx.engine.tableLoseInfluence(ctx.player.id, Number(data?.influenceIndex));
+      if (error) socket.emit('game:error', serverErrorPayload(error));
+    });
+
+    socket.on('table:prove_influence', (data) => {
+      const ctx = this.getTableContext(socket);
+      if (!ctx) return;
+      const error = ctx.engine.tableProveInfluence(ctx.player.id, Number(data?.influenceIndex));
+      if (error) socket.emit('game:error', serverErrorPayload(error));
+    });
+
+    socket.on('table:undo', () => {
+      const ctx = this.getTableContext(socket);
+      if (!ctx) return;
+      const error = ctx.engine.tableUndo(ctx.player.id);
+      if (error) socket.emit('game:error', serverErrorPayload(error));
+    });
+
+    socket.on('table:adjust_coins', (data) => {
+      const ctx = this.getTableContext(socket);
+      if (!ctx) return;
+      const error = ctx.engine.tableAdjustCoins(ctx.player.id, Number(data?.delta));
+      if (error) socket.emit('game:error', serverErrorPayload(error));
+    });
+
     socket.on('disconnect', () => {
       this.untrackConnection(socket);
       this.socketRateLimits.delete(socket.id);
       this.feedback.releaseConnection(socket.id);
       this.handleLeave(socket, false);
     });
+  }
+
+  /** A table mode game this socket is seated in, rate limited; reports the error otherwise. */
+  private getTableContext(socket: TypedSocket) {
+    if (!this.checkRateLimit(socket.id, 'table:entry', RATE_LIMIT_TABLE_ACTION_MS)) {
+      socket.emit('game:error', serverErrorPayload('Too many requests, please wait'));
+      return null;
+    }
+    const ctx = this.getGameContext(socket);
+    if (!ctx) return null;
+    if (!(ctx.engine instanceof TableEngine)) {
+      socket.emit('game:error', serverErrorPayload('Invalid action'));
+      return null;
+    }
+    return { room: ctx.room, player: ctx.player, engine: ctx.engine };
   }
 
   private getGameContext(socket: TypedSocket) {
@@ -1106,7 +1230,12 @@ export class SocketHandler {
       console.log(`Player ${playerName} left room ${roomCode}`);
       const room = this.roomManager.leaveRoom(roomCode, playerId);
       if (room && gameInProgress && playerAlive) {
-        this.handleBotReplacement(roomCode, playerId, 'left');
+        if (engine instanceof TableEngine) {
+          // No bots at a real table: a player who walks away is out.
+          engine.tableForfeit(playerId);
+        } else {
+          this.handleBotReplacement(roomCode, playerId, 'left');
+        }
       }
       this.afterSeatChange(room, wasPublic);
       return;
@@ -1116,7 +1245,8 @@ export class SocketHandler {
     // Grace expiry is broadcast via the room event listener.
     const outcome = this.roomManager.disconnectPlayer(roomCode, playerId);
 
-    if (outcome?.kind === 'in_game' && gameInProgress && playerAlive) {
+    // Table mode holds the seat until the player comes back (a sleeping phone is normal).
+    if (outcome?.kind === 'in_game' && gameInProgress && playerAlive && !(engine instanceof TableEngine)) {
       this.roomManager.startDisconnectTimer(roomCode, playerId, () => {
         this.handleBotReplacement(roomCode, playerId, 'disconnect');
       });
@@ -1204,6 +1334,7 @@ export class SocketHandler {
       settings: room.settings,
       lastWinnerId: room.lastWinnerId ?? null,
       spectators: spectators.map(({ socketId: _, ...rest }) => rest),
+      ...(room.settings.tableMode ? { firstPlayerId: room.firstPlayerId ?? null } : {}),
     });
   }
 

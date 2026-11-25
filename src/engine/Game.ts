@@ -31,7 +31,7 @@ export class Game {
 
   constructor(public readonly roomCode: string) {}
 
-  initialize(playerInfos: Array<{ id: string; name: string }>, options?: { gameMode?: GameMode; useInquisitor?: boolean }): void {
+  initialize(playerInfos: Array<{ id: string; name: string }>, options?: { gameMode?: GameMode; useInquisitor?: boolean; firstPlayerIndex?: number }): void {
     this.gameMode = options?.gameMode ?? GameMode.Classic;
     this.useInquisitor = options?.useInquisitor ?? false;
     const useInquisitor = this.useInquisitor;
@@ -72,8 +72,11 @@ export class Game {
       return player;
     });
 
-    // Randomize starting player
-    this.currentPlayerIndex = randomInt(this.players.length);
+    // Starting player: random, unless the table chose one (table mode)
+    const chosen = options?.firstPlayerIndex;
+    this.currentPlayerIndex = chosen !== undefined && chosen >= 0 && chosen < this.players.length
+      ? chosen
+      : randomInt(this.players.length);
     this.turnPhase = TurnPhase.AwaitingAction;
     this.status = GameStatus.InProgress;
     this.turnNumber = 1;

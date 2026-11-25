@@ -94,6 +94,15 @@ export interface LogMessageParams {
   examineForceSwap: P<'actor' | 'target'>;
   examineSwapDeckEmpty: P<'actor'>;
   examineReturn: P<'actor' | 'target'>;
+  // Table mode (TableEngine.ts)
+  tableAssassinatePaid: P<'actor' | 'amount'>;
+  tableCoupPaid: P<'actor' | 'amount'>;
+  tableProved: P<'actor' | 'character'>;
+  tablePassed: P<'actor'>;
+  tableUndone: P<'actor'>;
+  tableCoinsAdded: P<'actor' | 'amount'>;
+  tableCoinsRemoved: P<'actor' | 'amount'>;
+  tableLeft: P<'actor'>;
 }
 
 export type LogMessageKey = keyof LogMessageParams;

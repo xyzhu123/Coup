@@ -30,7 +30,7 @@ export type PlayerTimeoutCallback = (playerId: string, phase: TurnPhase) => void
 export class GameEngine {
   game: Game;
   private resolver: ActionResolver;
-  private onStateChange: StateChangeCallback | null = null;
+  protected onStateChange: StateChangeCallback | null = null;
   private onPlayerTimeout: PlayerTimeoutCallback | null = null;
 
   // Turn-specific state (mirrors what's in ResolverResult)
@@ -679,7 +679,7 @@ export class GameEngine {
     this.timerExpiry = null;
   }
 
-  private broadcastState(): void {
+  protected broadcastState(): void {
     if (this.onStateChange) {
       this.onStateChange(this.getFullState());
     }

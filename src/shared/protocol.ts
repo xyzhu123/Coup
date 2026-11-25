@@ -1,5 +1,5 @@
 import { FeedbackResponse, FeedbackSubmission } from './feedbackTypes';
-import { ActionType, BotPersonality, ChallengeRevealEvent, Character, ChatMessage, ClientGameState, ClientRoomPlayer, ClientSpectator, Faction, PublicRoomInfo, ReactionEvent, RoomOrigin, RoomSettings } from './types';
+import { ActionType, BotPersonality, TableAction, ChallengeRevealEvent, Character, ChatMessage, ClientGameState, ClientRoomPlayer, ClientSpectator, Faction, PublicRoomInfo, ReactionEvent, RoomOrigin, RoomSettings } from './types';
 import type { ServerErrorCode, ServerErrorParams } from './i18n/serverErrors';
 
 /**
@@ -47,6 +47,16 @@ export interface ClientToServerEvents {
   'game:choose_examine_influence': (data: { influenceIndex: number }) => void;
   'game:examine_decision': (data: { forceSwap: boolean }) => void;
 
+  // Table mode (in-person play): entries recorded after the table settled them
+  'table:action': (data: { action: TableAction; targetId?: string }) => void;
+  /** End the current turn with nothing recorded. The host may pass for another player. */
+  'table:pass': () => void;
+  'table:exchange': (data: { keepIndices: number[] }) => void;
+  'table:lose_influence': (data: { influenceIndex: number }) => void;
+  'table:prove_influence': (data: { influenceIndex: number }) => void;
+  'table:undo': () => void;
+  'table:adjust_coins': (data: { delta: number }) => void;
+
   // Chat
   /**
    * `phraseId` marks one of `QUICK_PHRASES`: the server then stores that
@@ -68,6 +78,10 @@ export interface ClientToServerEvents {
 
   // Room settings
   'room:update_settings': (data: { settings: RoomSettings }, callback: (response: { success: boolean } & AckError) => void) => void;
+  /** Host only, in the lobby: seat (and so turn) order, as every player id in order. */
+  'room:set_seat_order': (data: { playerIds: string[] }, callback: (response: { success: boolean } & AckError) => void) => void;
+  /** Host only, in the lobby: who takes the first turn in table mode. */
+  'room:set_first_player': (data: { playerId: string }, callback: (response: { success: boolean } & AckError) => void) => void;
 
   // Spectator
   'room:spectate': (data: { roomCode: string; playerName: string }, callback: (response: SpectateResponse) => void) => void;
@@ -86,7 +100,7 @@ export interface ClientToServerEvents {
 
 // ─── Server → Client Events ───
 export interface ServerToClientEvents {
-  'room:updated': (data: { players: ClientRoomPlayer[]; hostId: string; settings: RoomSettings; lastWinnerId?: string | null; spectators?: ClientSpectator[] }) => void;
+  'room:updated': (data: { players: ClientRoomPlayer[]; hostId: string; settings: RoomSettings; lastWinnerId?: string | null; spectators?: ClientSpectator[]; firstPlayerId?: string | null }) => void;
   'room:error': (data: ServerNotice) => void;
   'room:removed': (data: ServerNotice) => void;
   'game:state': (state: ClientGameState) => void;

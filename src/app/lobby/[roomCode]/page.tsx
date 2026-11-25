@@ -9,6 +9,7 @@ import { Character, GameMode, GameStatus } from '@/shared/types';
 import { ChatPanel } from '../../components/chat/ChatPanel';
 import { AddBotModal } from '../../components/lobby/AddBotModal';
 import { QRShareModal } from '../../components/lobby/QRShareModal';
+import { SeatOrderModal } from '../../components/lobby/SeatOrderModal';
 import { SettingsModal } from '../../components/settings/SettingsModal';
 import { HowToPlay } from '../../components/home/HowToPlay';
 import { CrownGlyph } from '../../components/icons';
@@ -28,13 +29,14 @@ export default function LobbyPage() {
   const router = useRouter();
   const params = useParams();
   const roomCode = params.roomCode as string;
-  const { startGame, leaveRoom, sendChat, addBot, addBots, removeBot, removePlayer, removeSpectator, updateRoomSettings } = useSocket();
+  const { startGame, leaveRoom, sendChat, addBot, addBots, removeBot, removePlayer, removeSpectator, updateRoomSettings, setSeatOrder, setFirstPlayer } = useSocket();
   const {
     playerId,
     hostId,
     roomPlayers,
     roomSettings,
     lastWinnerId,
+    firstPlayerId,
     spectators,
     chatMessages,
     gameState,
@@ -52,19 +54,26 @@ export default function LobbyPage() {
   const [copyStatus, setCopyStatus] = useState<'idle' | 'code' | 'link' | 'error'>('idle');
   const [inviteUrl, setInviteUrl] = useState(`https://coup.8tp.dev/lobby/${roomCode}`);
   const [fillingBots, setFillingBots] = useState(false);
+  const [showSeatOrder, setShowSeatOrder] = useState(false);
 
   const isHost = playerId === hostId;
   const canStart = roomPlayers.length >= MIN_PLAYERS && roomPlayers.length <= MAX_PLAYERS;
-  const startReason = roomPlayers.length < MIN_PLAYERS
+  const startReasonBase = roomPlayers.length < MIN_PLAYERS
     ? t('lobby.needMorePlayers', { count: MIN_PLAYERS - roomPlayers.length })
     : roomPlayers.length > MAX_PLAYERS
       ? t('lobby.tooManyPlayers')
       : t('lobby.startWhenReady');
-  const canAddBot = roomPlayers.length < MAX_PLAYERS;
+  // Table mode: playing in person. People only, seats in the order of the real table.
+  const tableMode = roomSettings?.tableMode === true;
+  const firstPlayer = roomPlayers.find(p => p.id === firstPlayerId) ?? roomPlayers[0];
   const hasBots = roomPlayers.some(p => p.isBot);
+  const canAddBot = roomPlayers.length < MAX_PLAYERS && !tableMode;
+  const startReason = canStart && tableMode && firstPlayer
+    ? t('lobby.tableStartHint', { name: firstPlayer.name })
+    : startReasonBase;
   // Host is the only human: offer to fill the table with bots instead of a dead "need players" state.
   const isOnlyHuman = isHost && roomPlayers.filter(p => !p.isBot).length === 1;
-  const botsToFill = isOnlyHuman ? botsNeededToFill(roomPlayers.length) : 0;
+  const botsToFill = isOnlyHuman && !tableMode ? botsNeededToFill(roomPlayers.length) : 0;
   const botReactionMax = Math.min(MAX_BOT_REACTION_SECONDS, roomSettings?.actionTimerSeconds ?? MAX_ACTION_TIMER);
 
   useEffect(() => {
@@ -179,6 +188,13 @@ export default function LobbyPage() {
     }
   };
 
+  /** Report a failed host change the same way the other lobby actions do. */
+  const reportFailure = (e: unknown) => {
+    const { setError } = useGameStore.getState();
+    setError(e instanceof Error ? e.message : t('errors.updateSettingsFailed'));
+    setTimeout(() => setError(null), 3000);
+  };
+
   const handleRemoveSpectator = async (spectatorId: string) => {
     try {
       await removeSpectator(spectatorId);
@@ -273,7 +289,7 @@ export default function LobbyPage() {
               <span className="figure text-coup-ink-mute">{t.number(roomPlayers.length)}/{t.number(MAX_PLAYERS)}</span>
             </div>
             <ul className="lobby-players">
-              {roomPlayers.map(p => (
+              {roomPlayers.map((p, seatIndex) => (
                 <li key={p.id} className={`lobby-player ${!p.isBot && !p.connected ? 'is-away' : ''}`}>
                   <div className="min-w-0 flex-1">
                     <p className={`lobby-player-name ${p.id === playerId ? 'text-coup-accent' : ''}`}>
@@ -281,6 +297,8 @@ export default function LobbyPage() {
                       {p.id === playerId ? t.rich('lobby.nameYou', { name: <bdi>{p.name}</bdi> }) : <bdi>{p.name}</bdi>}
                     </p>
                     <p className="lobby-player-meta">
+                      {tableMode && <span className="lobby-tag">{t('lobby.seatNumber', { number: seatIndex + 1 })}</span>}
+                      {tableMode && p.id === firstPlayer?.id && <span className="lobby-tag lobby-tag-host">{t('lobby.firstPlayer')}</span>}
                       {p.id === hostId && <span className="lobby-tag lobby-tag-host">{t('lobby.host')}</span>}
                       {p.isBot && (
                         <span className="lobby-tag">
@@ -297,6 +315,16 @@ export default function LobbyPage() {
                       {(p.wins ?? 0) > 0 && <span className="lobby-tag">{t.rich('lobby.wins', { count: p.wins ?? 0, fig })}</span>}
                     </p>
                   </div>
+                  {isHost && tableMode && p.id !== firstPlayer?.id && (
+                    <button
+                      type="button"
+                      className="btn-secondary text-xs px-2 py-1"
+                      aria-label={t('lobby.setFirstPlayerNamed', { name: p.name })}
+                      onClick={() => { haptic(); setFirstPlayer(p.id).catch(reportFailure); }}
+                    >
+                      {t('lobby.setFirstPlayer')}
+                    </button>
+                  )}
                   {isHost && p.id !== hostId && (
                     <button
                       onClick={() => { haptic(); if (p.isBot) handleRemoveBot(p.id); else handleRemovePlayer(p.id); }}
@@ -323,6 +351,14 @@ export default function LobbyPage() {
                     {t('lobby.fillSeats', { count: botsToFill })}
                   </button>
                 )}
+              </div>
+            )}
+
+            {isHost && tableMode && roomPlayers.length > 1 && (
+              <div className="menu-split">
+                <button className="btn-secondary" onClick={() => { haptic(); setShowSeatOrder(true); }}>
+                  {t('lobby.arrangeSeats')}
+                </button>
               </div>
             )}
 
@@ -377,6 +413,37 @@ export default function LobbyPage() {
                 <div className="lobby-setting-head"><span>{t('lobby.visibility')}</span><span>{roomSettings.isPublic ? t('lobby.public') : t('lobby.private')}</span></div>
               )}
 
+              {isHost ? (
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={tableMode}
+                  className="menu-switch"
+                  disabled={!tableMode && hasBots}
+                  onClick={() => {
+                    haptic();
+                    updateRoomSettings(tableMode
+                      ? { ...roomSettings, tableMode: false }
+                      : { ...roomSettings, tableMode: true, gameMode: GameMode.Classic, useInquisitor: false },
+                    ).catch(reportFailure);
+                  }}
+                >
+                  <span>
+                    <span className="block font-semibold text-coup-ink">{t('lobby.tableMode')}</span>
+                    <span className="block text-sm text-coup-ink-mute">
+                      {tableMode ? t('lobby.tableModeOn') : hasBots ? t('errors.table_no_bots') : t('lobby.tableModeOff')}
+                    </span>
+                  </span>
+                  <span className={`switch-track ${tableMode ? 'is-on' : ''}`} aria-hidden="true"><span /></span>
+                </button>
+              ) : (
+                <div className="lobby-setting">
+                  <div className="lobby-setting-head"><span>{t('lobby.tableMode')}</span><span>{tableMode ? t('lobby.yes') : t('lobby.no')}</span></div>
+                  {tableMode && <span className="text-sm text-coup-ink-mute">{t('lobby.tableModeOn')}</span>}
+                </div>
+              )}
+
+              {!tableMode && (<>
               <div className="lobby-setting">
                 <div className="lobby-setting-head"><span>{t('lobby.gameMode')}</span></div>
                 {isHost ? (
@@ -430,6 +497,7 @@ export default function LobbyPage() {
               {hasBots && settingRange(t('lobby.botThinking'), roomSettings.botMinReactionSeconds, MIN_BOT_REACTION_SECONDS, botReactionMax, 0.5, (v) => {
                 updateRoomSettings({ ...roomSettings, botMinReactionSeconds: v });
               })}
+              </>)}
             </section>
           )}
         </div>
@@ -468,6 +536,12 @@ export default function LobbyPage() {
         onClose={() => setShowAddBotModal(false)}
         onAdd={handleAddBot}
         existingNames={roomPlayers.map(p => p.name)}
+      />
+      <SeatOrderModal
+        open={showSeatOrder}
+        onClose={() => setShowSeatOrder(false)}
+        players={roomPlayers}
+        onSave={(ids) => { setSeatOrder(ids).catch(reportFailure); }}
       />
       <QRShareModal open={showQRModal} onClose={() => setShowQRModal(false)} roomCode={roomCode} />
       <SettingsModal open={showSettings} onClose={() => setShowSettings(false)} />

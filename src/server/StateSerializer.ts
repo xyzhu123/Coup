@@ -42,6 +42,7 @@ export function serializeForSpectator(state: GameState, spectatorId: string, roo
     gameMode: state.gameMode,
     useInquisitor: state.useInquisitor,
     treasuryReserve: state.treasuryReserve,
+    ...tableFields(state),
   };
 }
 
@@ -77,7 +78,13 @@ export function serializeForPlayer(state: GameState, playerId: string, roomPlaye
     gameMode: state.gameMode,
     useInquisitor: state.useInquisitor,
     treasuryReserve: state.treasuryReserve,
+    ...tableFields(state),
   };
+}
+
+/** Table mode's public fields; absent for the online game so its payload is unchanged. */
+function tableFields(state: GameState): Pick<ClientGameState, 'tableMode' | 'tableUndoPlayerId'> | undefined {
+  return state.tableMode ? { tableMode: true, tableUndoPlayerId: state.tableUndoPlayerId ?? null } : undefined;
 }
 
 function serializePlayer(player: import('../shared/types').PlayerState, viewerId: string, roomPlayers?: RoomPlayer[], isGameOver?: boolean): ClientPlayerState {

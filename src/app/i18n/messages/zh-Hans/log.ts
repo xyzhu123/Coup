@@ -49,6 +49,15 @@ const log: NamespaceTranslation<'log'> = {
   examineForceSwap: '{actor, select, you {你} other {{actor} }}强制{target, select, you {你} other { {target} }}换掉一张牌。',
   examineSwapDeckEmpty: '牌堆已空，{actor, select, you {你} other { {actor} }}无法强制换牌。那张牌已归还。',
   examineReturn: '{actor, select, you {你} other {{actor} }}把牌还给了{target, select, you {你} other { {target}}}。',
+  // Table mode
+  tableAssassinatePaid: '{actor, select, you {你} other {{actor} }}支付 {amount, plural, other {# 枚金币}}进行暗杀。',
+  tableCoupPaid: '{actor, select, you {你} other {{actor} }}支付 {amount, plural, other {# 枚金币}}发动政变。',
+  tableProved: '{actor, select, you {你} other {{actor} }}亮出{character}，并换了一张新牌。',
+  tablePassed: '{actor, select, you {你} other {{actor} }}的回合结束，没有生效。',
+  tableUndone: '{actor, select, you {你} other {{actor} }}撤销了上一步。',
+  tableCoinsAdded: '{actor, select, you {你} other {{actor} }}更正金币：加 {amount, plural, other {# 枚金币}}。',
+  tableCoinsRemoved: '{actor, select, you {你} other {{actor} }}更正金币：减 {amount, plural, other {# 枚金币}}。',
+  tableLeft: '{actor, select, you {你} other {{actor} }}离开了牌桌。',
 
   you: '你',
   unknownPlayer: '某位玩家',

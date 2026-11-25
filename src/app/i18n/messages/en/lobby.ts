@@ -113,6 +113,25 @@ const lobby = {
   copied: 'Copied',
   copyLink: 'Copy link',
   copyLinkFailed: 'Copy failed. Select the link above.',
+
+  // Table mode: playing in person
+  tableMode: 'Table mode',
+  tableModeOn: 'For playing in person. The app keeps cards and coins. You settle claims, challenges and blocks out loud.',
+  tableModeOff: 'Off. The app runs every claim, challenge and block.',
+  /** Tag on a player row: their seat number, clockwise. */
+  seatNumber: 'Seat {number}',
+  /** Tag on the player who takes the first turn. */
+  firstPlayer: 'Goes first',
+  /** Button on a player row, host only. */
+  setFirstPlayer: 'Set first',
+  setFirstPlayerNamed: 'Make {name} go first',
+  arrangeSeats: 'Arrange seats',
+  seatOrderTitle: 'Seat order',
+  seatOrderHelp: 'Tap the players in clockwise order around your table.',
+  seatOrderRestart: 'Start over',
+  seatOrderSave: 'Save order',
+  /** Hint under the start button in table mode. */
+  tableStartHint: 'Seats go clockwise. {name} goes first.',
 } satisfies Record<string, string>;
 
 export default lobby;

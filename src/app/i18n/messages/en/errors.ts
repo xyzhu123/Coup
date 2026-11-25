@@ -87,6 +87,9 @@ const server = {
   not_your_examine: "It's not your Examine.",
   invalid_examine: "That Examine can't go ahead.",
   cannot_present_revealed: 'Show a hidden card.',
+  table_no_bots: 'Table mode is for people only. Remove the bots first.',
+  finish_exchange_first: 'Finish your exchange first.',
+  nothing_to_undo: 'Nothing to take back.',
   moment_passed: 'Too late. That step is over.',
   unknown: '',
 } satisfies Record<ServerErrorCode, string>;

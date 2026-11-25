@@ -7,6 +7,7 @@ import { logMsg } from '../shared/i18n/logMessages';
 import { graphemeLength, nameKey } from '../shared/textLimits';
 import { FeedbackRoomSnapshot, FeedbackRoomState, FeedbackSenderStatus } from '../shared/feedbackTypes';
 import { GameEngine } from '../engine/GameEngine';
+import { TableEngine } from '../engine/TableEngine';
 import { BotController } from './BotController';
 import { GameLogger } from './GameLogger';
 import { emitMetric } from './metrics';
@@ -170,6 +171,7 @@ export class RoomManager {
     const room = this.rooms.get(roomCode.toUpperCase());
     if (!room) return { error: 'Room not found' };
     if (room.gameState) return { error: 'Game already in progress' };
+    if (room.settings.tableMode) return { error: 'Table mode is for people only. Remove the bots first.' };
     if (room.players.length >= MAX_PLAYERS) return { error: 'Room is full' };
 
     if (room.players.some(p => nameKey(p.name) === nameKey(name))) {
@@ -318,6 +320,9 @@ export class RoomManager {
 
   /** Arm (or re-arm) the lobby grace timer for a disconnected human. */
   private armLobbyGrace(roomCode: string, playerId: string, onGraceExpired?: (room: Room | null) => void): void {
+    // Table mode: phones sleep on the table between turns and between games,
+    // so a dropped socket never costs a seat. The host can still remove a player.
+    if (this.rooms.get(roomCode)?.settings.tableMode) return;
     this.startDisconnectTimer(roomCode, playerId, () => {
       const result = this.releaseDisconnectedSeat(roomCode, playerId);
       if (result === 'kept') return;
@@ -467,11 +472,67 @@ export class RoomManager {
     botReaction = Math.round(botReaction * 2) / 2; // round to nearest 0.5
     botReaction = Math.min(botReaction, timer); // can't exceed action timer
 
+    // Table mode (in-person play) is Classic rules with people only
+    const tableMode = settings.tableMode === true;
+    if (tableMode && room.players.some(p => p.isBot)) {
+      return { error: 'Table mode is for people only. Remove the bots first.' };
+    }
+
     // Validate game mode and inquisitor settings
-    const gameMode = settings.gameMode === GameMode.Reformation ? GameMode.Reformation : GameMode.Classic;
+    const gameMode = !tableMode && settings.gameMode === GameMode.Reformation ? GameMode.Reformation : GameMode.Classic;
     const useInquisitor = gameMode === 'Reformation' ? !!settings.useInquisitor : false;
 
-    room.settings = { actionTimerSeconds: timer, turnTimerSeconds: turnTimer, isPublic: !!settings.isPublic, botMinReactionSeconds: botReaction, gameMode, useInquisitor };
+    const wasTableMode = room.settings.tableMode === true;
+    room.settings = {
+      actionTimerSeconds: timer, turnTimerSeconds: turnTimer, isPublic: !!settings.isPublic, botMinReactionSeconds: botReaction, gameMode, useInquisitor,
+      ...(tableMode ? { tableMode: true } : {}),
+    };
+    if (tableMode !== wasTableMode) this.syncSeatHolding(room);
+    return { success: true };
+  }
+
+  /**
+   * Table mode holds a dropped player's seat for as long as the room lives;
+   * the online game releases it after a grace period. When the mode is
+   * switched in the lobby, bring the pending timers in line with it.
+   */
+  private syncSeatHolding(room: Room): void {
+    const away = room.players.filter(p => !p.isBot && !p.connected);
+    if (room.settings.tableMode) {
+      for (const player of away) this.cancelDisconnectTimer(room.code, player.id);
+    } else {
+      for (const player of away) this.armLobbyGrace(room.code, player.id);
+    }
+  }
+
+  /**
+   * Seat order, set by the host in the lobby so turns go round the real
+   * table. `playerIds` must be exactly the room's players, each once.
+   */
+  setSeatOrder(roomCode: string, playerIds: string[]): { success: boolean } | { error: string } {
+    const room = this.rooms.get(roomCode.toUpperCase());
+    if (!room) return { error: 'Room not found' };
+    if (room.gameState) return { error: 'Cannot change the seats during a game' };
+    if (!Array.isArray(playerIds) || playerIds.length !== room.players.length) return { error: 'Invalid seat order' };
+    const byId = new Map(room.players.map(p => [p.id, p]));
+    const ordered: RoomPlayer[] = [];
+    for (const id of playerIds) {
+      const player = typeof id === 'string' ? byId.get(id) : undefined;
+      if (!player) return { error: 'Invalid seat order' };
+      byId.delete(id);
+      ordered.push(player);
+    }
+    room.players = ordered;
+    return { success: true };
+  }
+
+  /** Who takes the first turn in table mode, chosen by the host in the lobby. */
+  setFirstPlayer(roomCode: string, playerId: string): { success: boolean } | { error: string } {
+    const room = this.rooms.get(roomCode.toUpperCase());
+    if (!room) return { error: 'Room not found' };
+    if (room.gameState) return { error: 'Cannot change the seats during a game' };
+    if (!room.players.some(p => p.id === playerId)) return { error: 'Invalid first player' };
+    room.firstPlayerId = playerId;
     return { success: true };
   }
 
@@ -524,13 +585,23 @@ export class RoomManager {
     // Clear previous game's winner so the onStateChange guard can detect new wins
     room.lastWinnerId = undefined;
 
+    const tableMode = room.settings.tableMode === true;
+    if (tableMode && room.players.some(p => p.isBot)) {
+      return { error: 'Table mode is for people only. Remove the bots first.' };
+    }
+
     const timerMs = room.settings.actionTimerSeconds * 1000;
     const turnTimerMs = room.settings.turnTimerSeconds * 1000;
-    const engine = new GameEngine(roomCode, timerMs, turnTimerMs);
-    engine.startGame(
-      room.players.map(p => ({ id: p.id, name: p.name })),
-      { gameMode: room.settings.gameMode, useInquisitor: room.settings.useInquisitor },
-    );
+    const playerInfos = room.players.map(p => ({ id: p.id, name: p.name }));
+    let engine: GameEngine;
+    if (tableMode) {
+      const tableEngine = new TableEngine(roomCode);
+      tableEngine.startGame(playerInfos, { firstPlayerId: room.firstPlayerId });
+      engine = tableEngine;
+    } else {
+      engine = new GameEngine(roomCode, timerMs, turnTimerMs);
+      engine.startGame(playerInfos, { gameMode: room.settings.gameMode, useInquisitor: room.settings.useInquisitor });
+    }
 
     this.engines.set(roomCode, engine);
     room.gameState = engine.getFullState();
@@ -540,7 +611,8 @@ export class RoomManager {
     this.clearDisconnectTimersForRoom(roomCode);
     this.clearAfkStrikesForRoom(roomCode);
     const disconnectedHumans = room.players.filter(p => !p.isBot && !p.connected);
-    for (const player of disconnectedHumans) {
+    // Table mode keeps a dropped player's seat: no bot ever takes it.
+    for (const player of tableMode ? [] : disconnectedHumans) {
       const playerId = player.id;
       this.startDisconnectTimer(roomCode, playerId, () => {
         options.onDisconnectedSeatExpired?.(playerId);
@@ -861,8 +933,10 @@ export class RoomManager {
     this.clearDisconnectTimersForRoom(roomCode);
     this.clearAfkStrikesForRoom(roomCode);
 
-    // Remove disconnected human players (unless in grace) and bot-replaced players; original bots survive
-    room.players = room.players.filter(p => (p.isBot && !p.replacedByBot) || p.connected || inGrace.has(p.id));
+    // Remove disconnected human players (unless in grace) and bot-replaced players; original bots survive.
+    // Table mode keeps everyone who has not walked away, so the seat order survives a sleeping phone.
+    const keepsSeat = (p: RoomPlayer) => room.settings.tableMode === true && !p.isBot && p.socketId !== '';
+    room.players = room.players.filter(p => (p.isBot && !p.replacedByBot) || p.connected || inGrace.has(p.id) || keepsSeat(p));
     for (const playerId of inGrace) this.armLobbyGrace(roomCode, playerId);
 
     // If room is empty after filtering, delete it
@@ -1056,6 +1130,8 @@ export class RoomManager {
 
     const engine = this.engines.get(roomCode);
     if (!engine || engine.game.status !== GameStatus.InProgress) return false;
+    // Table mode has no bots: a seat waits for its player.
+    if (engine instanceof TableEngine) return false;
 
     const roomPlayer = room.players.find(p => p.id === playerId);
     if (!roomPlayer || roomPlayer.isBot) return false;
@@ -1202,7 +1278,9 @@ export class RoomManager {
       // Clean up rooms with games but no connected human players and no
       // human activity for INACTIVE_ROOM_CLEANUP_MS (120s)
       const engine = this.engines.get(code);
-      if (engine) {
+      // A table mode game is played face to face: every phone may be asleep
+      // for minutes while the table argues, so only the 24h TTL closes it.
+      if (engine && !(engine instanceof TableEngine)) {
         const hasConnectedHuman = room.players.some(p => !p.isBot && p.connected);
         if (!hasConnectedHuman) {
           const lastActivity = this.lastHumanActivityAt.get(code) ?? room.createdAt;
