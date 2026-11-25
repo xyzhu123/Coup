@@ -10,6 +10,7 @@ import { ChatPanel } from '../../components/chat/ChatPanel';
 import { AddBotModal } from '../../components/lobby/AddBotModal';
 import { QRShareModal } from '../../components/lobby/QRShareModal';
 import { SeatOrderModal } from '../../components/lobby/SeatOrderModal';
+import { RenameModal } from '../../components/lobby/RenameModal';
 import { SettingsModal } from '../../components/settings/SettingsModal';
 import { HowToPlay } from '../../components/home/HowToPlay';
 import { CrownGlyph } from '../../components/icons';
@@ -55,6 +56,7 @@ export default function LobbyPage() {
   const [inviteUrl, setInviteUrl] = useState(`https://coup.8tp.dev/lobby/${roomCode}`);
   const [fillingBots, setFillingBots] = useState(false);
   const [showSeatOrder, setShowSeatOrder] = useState(false);
+  const [showRename, setShowRename] = useState(false);
 
   const isHost = playerId === hostId;
   const canStart = roomPlayers.length >= MIN_PLAYERS && roomPlayers.length <= MAX_PLAYERS;
@@ -315,6 +317,15 @@ export default function LobbyPage() {
                       {(p.wins ?? 0) > 0 && <span className="lobby-tag">{t.rich('lobby.wins', { count: p.wins ?? 0, fig })}</span>}
                     </p>
                   </div>
+                  {p.id === playerId && (
+                    <button
+                      type="button"
+                      className="btn-secondary text-xs px-2 py-1"
+                      onClick={() => { haptic(); setShowRename(true); }}
+                    >
+                      {t('lobby.rename')}
+                    </button>
+                  )}
                   {isHost && tableMode && p.id !== firstPlayer?.id && (
                     <button
                       type="button"
@@ -537,6 +548,12 @@ export default function LobbyPage() {
         onAdd={handleAddBot}
         existingNames={roomPlayers.map(p => p.name)}
       />
+      <RenameModal
+        open={showRename}
+        onClose={() => setShowRename(false)}
+        currentName={roomPlayers.find(p => p.id === playerId)?.name ?? ''}
+      />
+
       <SeatOrderModal
         open={showSeatOrder}
         onClose={() => setShowSeatOrder(false)}

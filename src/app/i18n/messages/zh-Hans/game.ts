@@ -230,6 +230,7 @@ const game: NamespaceTranslation<'game'> = {
   'table.stealTitle': '勒索谁',
   'table.exchangeAsk': '从牌堆抽 2 张牌。抽牌后无法撤销。',
   'table.more': '更多',
+  'table.guide': '教程',
   'table.exchangeTitle': '{count, plural, other {留下 # 张}}',
   'table.exchangeBody': '其余的牌洗回牌堆。',
   'table.exchangeConfirm': '留下这些',

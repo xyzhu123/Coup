@@ -536,6 +536,26 @@ export class RoomManager {
     return { success: true };
   }
 
+  /**
+   * A player changes their own name: any time in the lobby, and during a table
+   * mode game, where people rename themselves to match their seats. An online
+   * game keeps its names until it is over.
+   */
+  renamePlayer(roomCode: string, playerId: string, name: string): { success: boolean } | { error: string } {
+    const room = this.rooms.get(roomCode.toUpperCase());
+    if (!room) return { error: 'Room not found' };
+    const player = room.players.find(p => p.id === playerId);
+    if (!player || player.isBot) return { error: 'Player not found' };
+    if (room.players.some(p => p.id !== playerId && nameKey(p.name) === nameKey(name))) {
+      return { error: 'Name already taken in this room' };
+    }
+    const engine = this.engines.get(room.code);
+    if (engine && !(engine instanceof TableEngine)) return { error: 'Cannot change your name during a game' };
+    player.name = name;
+    if (engine instanceof TableEngine) engine.tableRename(playerId, name);
+    return { success: true };
+  }
+
   getPublicRooms(): PublicRoomInfo[] {
     const result: PublicRoomInfo[] = [];
     for (const room of this.rooms.values()) {

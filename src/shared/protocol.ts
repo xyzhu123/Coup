@@ -82,6 +82,8 @@ export interface ClientToServerEvents {
   'room:set_seat_order': (data: { playerIds: string[] }, callback: (response: { success: boolean } & AckError) => void) => void;
   /** Host only, in the lobby: who takes the first turn in table mode. */
   'room:set_first_player': (data: { playerId: string }, callback: (response: { success: boolean } & AckError) => void) => void;
+  /** Change your own name: in the lobby, or during a table mode game. `name` comes back as the server stored it. */
+  'room:rename': (data: { name: string }, callback: (response: { success: boolean; name?: string } & AckError) => void) => void;
 
   // Spectator
   'room:spectate': (data: { roomCode: string; playerName: string }, callback: (response: SpectateResponse) => void) => void;

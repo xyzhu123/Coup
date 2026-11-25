@@ -148,10 +148,10 @@ function OverviewTab() {
   );
 }
 
-function CharactersTab() {
+/** The character roster. `characters` narrows it to the ones in play (the table guide lists Classic only). */
+export function CharactersTab({ characters = Object.values(Character) }: { characters?: readonly Character[] }) {
   const t = useT();
   const p = learnParams(t);
-  const characters = Object.values(Character);
 
   return (
     <div className="grid gap-3">

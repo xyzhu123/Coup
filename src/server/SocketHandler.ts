@@ -1,7 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { ClientToServerEvents, ServerToClientEvents } from '../shared/protocol';
 import { ActionType, BotPersonality, BotReplaceReason, Character, ClientRoomPlayer, GameState, GameStatus, RoomOrigin, TABLE_ACTIONS, TableAction, TurnPhase } from '../shared/types';
-import { MAX_PLAYERS, QUICK_PHRASES, REACTIONS,RATE_LIMIT_ROOM_CREATE_MS, RATE_LIMIT_ROOM_JOIN_MS, RATE_LIMIT_GAME_ACTION_MS, RATE_LIMIT_BOT_ADD_MS, RATE_LIMIT_TABLE_ACTION_MS } from '../shared/constants';
+import { MAX_PLAYERS, QUICK_PHRASES, REACTIONS,RATE_LIMIT_ROOM_CREATE_MS, RATE_LIMIT_ROOM_JOIN_MS, RATE_LIMIT_GAME_ACTION_MS, RATE_LIMIT_BOT_ADD_MS, RATE_LIMIT_TABLE_ACTION_MS, RATE_LIMIT_RENAME_MS } from '../shared/constants';
 import { validateName, validateChatMessage } from './ContentFilter';
 import { nameKey } from '../shared/textLimits';
 import { failedAck, serverErrorPayload } from '../shared/i18n/serverErrors';
@@ -648,6 +648,31 @@ export class SocketHandler {
         return;
       }
       callback({ success: true });
+      this.broadcastRoomUpdate(found.room.code);
+    });
+
+    socket.on('room:rename', (data, callback) => {
+      if (typeof callback !== 'function') return;
+      const found = this.roomManager.getPlayerRoom(socket.id);
+      if (!found) {
+        callback(failedAck('Not in a room'));
+        return;
+      }
+      if (!this.checkRateLimit(socket.id, 'room:rename', RATE_LIMIT_RENAME_MS)) {
+        callback(failedAck('Too many requests, please wait'));
+        return;
+      }
+      const nameResult = validateName(data?.name);
+      if (!nameResult.valid) {
+        callback(failedAck(nameResult.error));
+        return;
+      }
+      const result = this.roomManager.renamePlayer(found.room.code, found.player.id, nameResult.sanitized);
+      if ('error' in result) {
+        callback(failedAck(result.error));
+        return;
+      }
+      callback({ success: true, name: nameResult.sanitized });
       this.broadcastRoomUpdate(found.room.code);
     });
 

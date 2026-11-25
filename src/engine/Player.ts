@@ -2,7 +2,8 @@ import { Character, Faction, Influence, PlayerState } from '../shared/types';
 
 export class Player {
   readonly id: string;
-  readonly name: string;
+  /** Changes only through `TableEngine.tableRename`. */
+  name: string;
   coins: number;
   influences: Influence[];
   seatIndex: number;

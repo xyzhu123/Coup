@@ -3,7 +3,7 @@ import { RoomManager } from '@/server/RoomManager';
 import { TableEngine } from '@/engine/TableEngine';
 import { GameEngine } from '@/engine/GameEngine';
 import { DEFAULT_ROOM_SETTINGS, DISCONNECT_BOT_REPLACE_MS, INACTIVE_ROOM_CLEANUP_MS, LOBBY_DISCONNECT_GRACE_MS } from '@/shared/constants';
-import { GameMode, GameStatus } from '@/shared/types';
+import { ActionType, GameMode, GameStatus } from '@/shared/types';
 
 /** Table mode: playing in person. Seats and first player are the host's; nobody loses a seat to a sleeping phone. */
 describe('RoomManager table mode', () => {
@@ -154,6 +154,38 @@ describe('RoomManager table mode', () => {
       vi.advanceTimersByTime(LOBBY_DISCONNECT_GRACE_MS * 2);
       manager.resetToLobby(room.code);
       expect(room.players.map(p => p.id)).toEqual([ids[0], ids[1]]);
+    });
+  });
+
+  describe('changing your name', () => {
+    it('works in the lobby, and refuses a name someone else has', () => {
+      const { room, ids } = tableRoom();
+      expect(manager.renamePlayer(room.code, ids[1], 'Robert')).toEqual({ success: true });
+      expect(room.players[1].name).toBe('Robert');
+      expect(manager.renamePlayer(room.code, ids[1], 'alice')).toEqual({ error: 'Name already taken in this room' });
+      // Your own name in another case is yours to take.
+      expect(manager.renamePlayer(room.code, ids[1], 'ROBERT')).toEqual({ success: true });
+      expect(manager.renamePlayer(room.code, 'nobody', 'Zed')).toEqual({ error: 'Player not found' });
+    });
+
+    it('works during a table game, on the seat and in the room', () => {
+      const { room, ids } = tableRoom();
+      const engine = manager.startGame(room.code) as TableEngine;
+      engine.tableAction(ids[0], ActionType.Income);
+      expect(manager.renamePlayer(room.code, ids[1], 'Seat Two')).toEqual({ success: true });
+      expect(room.players[1].name).toBe('Seat Two');
+      expect(engine.getFullState().players[1].name).toBe('Seat Two');
+      // The game carries on untouched.
+      expect(engine.getFullState().players[engine.getFullState().currentPlayerIndex].id).toBe(ids[1]);
+      expect(engine.tableAction(ids[1], ActionType.Income)).toBeNull();
+    });
+
+    it('waits for the lobby in an online game', () => {
+      const { room, playerId } = manager.createRoom('Alice', 's0');
+      manager.joinRoom(room.code, 'Bob', 's1');
+      manager.startGame(room.code);
+      expect(manager.renamePlayer(room.code, playerId, 'Alicia')).toEqual({ error: 'Cannot change your name during a game' });
+      expect(room.players[0].name).toBe('Alice');
     });
   });
 });

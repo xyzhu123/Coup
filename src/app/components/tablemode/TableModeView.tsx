@@ -7,11 +7,14 @@ import { actionName, characterName, useT } from '../../i18n';
 import { getSocket } from '../../hooks/useSocket';
 import { useGameStore } from '../../stores/gameStore';
 import { haptic, hapticHeavy } from '../../utils/haptic';
+import { learnParams } from '../../utils/learnText';
 import { CardFace } from '../game/CardFace';
 import { LogCharacter, LogStamp, renderLogText, useLogContext } from '../game/LogLine';
 import { CardBack, CoinIcon } from '../icons';
+import { RenameModal } from '../lobby/RenameModal';
 import { SettingsModal } from '../settings/SettingsModal';
 import { Modal } from '../ui/Modal';
+import { TableGuide } from './TableGuide';
 
 interface TableModeViewProps {
   gameState: ClientGameState;
@@ -74,6 +77,8 @@ export function TableModeView({ gameState, isHost, isSpectator, onRematch, onLea
   const [showCorrect, setShowCorrect] = useState(false);
   const [showLog, setShowLog] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
+  const [showRename, setShowRename] = useState(false);
   const [showLeave, setShowLeave] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [keep, setKeep] = useState<number[]>([]);
@@ -231,7 +236,10 @@ export function TableModeView({ gameState, isHost, isSpectator, onRematch, onLea
           <p className="menu-label">{t('game.table.title')} · <span className="figure">{gameState.roomCode}</span></p>
           <p className="text-sm text-coup-ink-mute">{t('game.table.deck', { count: gameState.deckCount })}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
+          <button type="button" className="btn-secondary text-sm px-3 py-2" onClick={() => { haptic(); setShowGuide(true); }}>
+            {t('game.table.guide')}
+          </button>
           <button type="button" className="btn-secondary text-sm px-3 py-2" onClick={() => { haptic(); setShowLog(true); }}>
             {t('game.table.log')}
           </button>
@@ -411,7 +419,12 @@ export function TableModeView({ gameState, isHost, isSpectator, onRematch, onLea
         {cardSheet && sheetInfluence && (
           cardSheet.step === 'choose' ? (
             <div className="flex flex-col gap-3">
-              <div className="flex justify-center"><CardFace influence={sheetInfluence} size="lg" disablePreview /></div>
+              <div className="flex items-center gap-4 mb-1">
+                <div className="shrink-0"><CardFace influence={sheetInfluence} size="lg" disablePreview /></div>
+                {sheetCharacter && (
+                  <p className="min-w-0 text-coup-ink-mute">{t(`rules.character.${sheetCharacter}`, learnParams(t))}</p>
+                )}
+              </div>
               <button type="button" className="btn-secondary w-full min-h-14" onClick={() => { haptic(); setCardSheet({ ...cardSheet, step: 'lose' }); }}>
                 {t('game.table.loseOption')}
               </button>
@@ -506,6 +519,11 @@ export function TableModeView({ gameState, isHost, isSpectator, onRematch, onLea
               {t('game.table.passFor', { name: current.name })}
             </button>
           )}
+          {me && (
+            <button type="button" className="btn-secondary w-full min-h-14" onClick={() => { setShowMore(false); setShowRename(true); }}>
+              {t('lobby.rename')}
+            </button>
+          )}
           <button type="button" className="btn-secondary w-full min-h-14" onClick={() => { setShowMore(false); setShowSettings(true); }}>
             {t('common.settings')}
           </button>
@@ -560,6 +578,10 @@ export function TableModeView({ gameState, isHost, isSpectator, onRematch, onLea
           <button type="button" className="btn-danger flex-1 min-h-14" disabled={!leaveArmed} onClick={() => { setShowLeave(false); onLeave?.(); }}>{t('game.table.leave')}</button>
         </div>
       </Modal>
+
+      <RenameModal open={showRename && !!me} onClose={() => setShowRename(false)} currentName={me?.name ?? ''} />
+
+      <TableGuide open={showGuide} onClose={() => setShowGuide(false)} />
 
       <SettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
     </div>

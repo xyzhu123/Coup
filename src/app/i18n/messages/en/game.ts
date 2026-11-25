@@ -308,6 +308,8 @@ const game = {
   'table.stealTitle': 'Steal from',
   'table.exchangeAsk': "You draw 2 cards from the deck. This can't be undone.",
   'table.more': 'More',
+  /** Header button and dialog title: the characters and actions reference. */
+  'table.guide': 'Guide',
   'table.exchangeTitle': 'Keep {count, plural, one {# card} other {# cards}}',
   'table.exchangeBody': 'The rest go back into the deck.',
   'table.exchangeConfirm': 'Keep these',

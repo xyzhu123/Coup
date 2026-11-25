@@ -55,6 +55,7 @@ const RULES = [
   { code: 'seat_taken_by_bot', match: 'A bot took your seat while you were inactive' },
   { code: 'invalid_session', match: 'Invalid session token' },
   { code: 'settings_locked', match: /^Cannot change (settings|the seats) during a game$/ },
+  { code: 'rename_locked', match: 'Cannot change your name during a game' },
   { code: 'table_no_bots', match: 'Table mode is for people only. Remove the bots first.' },
   { code: 'invalid_settings', match: /^Invalid (action timer|turn timer|bot reaction time) value$/ },
   { code: 'timer_range', match: /^Timer must be between (\d+) and (\d+) seconds$/, params: m => ({ min: Number(m[1]), max: Number(m[2]) }) },

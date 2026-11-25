@@ -97,6 +97,8 @@ const lobby: NamespaceTranslation<'lobby'> = {
   setFirstPlayer: '设为先手',
   setFirstPlayerNamed: '让 {name} 先手',
   arrangeSeats: '排座位',
+  rename: '改名',
+  renameSave: '保存',
   seatOrderTitle: '座位顺序',
   seatOrderHelp: '按你们桌上的顺时针方向，依次点每位玩家。',
   seatOrderRestart: '重排',

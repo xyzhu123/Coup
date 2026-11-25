@@ -349,6 +349,18 @@ export class TableEngine extends GameEngine {
     return null;
   }
 
+  /**
+   * A player changes the name on their seat, at any point in the game. The log
+   * names players by id, so earlier lines follow the new name on every screen.
+   */
+  tableRename(playerId: string, name: string): string | null {
+    const player = this.game.getPlayer(playerId);
+    if (!player) return 'Player not found';
+    player.name = name;
+    this.broadcastState();
+    return null;
+  }
+
   /** A player walked away for good: their cards are turned up and they are out. */
   tableForfeit(playerId: string): boolean {
     const game = this.game;

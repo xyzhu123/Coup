@@ -126,6 +126,9 @@ const lobby = {
   setFirstPlayer: 'Set first',
   setFirstPlayerNamed: 'Make {name} go first',
   arrangeSeats: 'Arrange seats',
+  /** Button and dialog title: change your own name (lobby, and More in table mode). */
+  rename: 'Change name',
+  renameSave: 'Save',
   seatOrderTitle: 'Seat order',
   seatOrderHelp: 'Tap the players in clockwise order around your table.',
   seatOrderRestart: 'Start over',
