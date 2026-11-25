@@ -183,7 +183,8 @@ export function CharactersTab({ characters = Object.values(Character) }: { chara
 /** An empty cell in the actions table. */
 const DASH = <>&mdash;</>;
 
-function RulesTab() {
+/** The actions table and the challenge, block and forced Coup rules. Also the table guide's second tab. */
+export function RulesTab() {
   const t = useT();
   const p = learnParams(t);
   const action = (a: ActionType) => actionName(t, a);
